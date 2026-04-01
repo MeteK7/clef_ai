@@ -1,0 +1,11 @@
+Id,Title,Description,StatusId,PriorityId,AssigneeId,DueDate,EstimatedTime,TimeSpent,BoardColumnId,BoardId,DateCreated,CreatedBy
+1,Project Task 1,Task related to Software Engineer or music integration 1,1,2,user_001,2026-04-29 23:10:02.183312,7.343068532156014,3.4997462238668637,1,1,2026-04-01 23:10:02.183312,user_001
+2,Project Task 2,Task related to Software Engineer or music integration 2,1,1,user_001,2026-04-30 23:10:02.183312,2.9520837079669544,2.949630295281886,2,2,2026-04-01 23:10:02.183312,user_001
+3,Project Task 3,Task related to Software Engineer or music integration 3,1,1,user_001,2026-04-11 23:10:02.183312,2.0340839002795934,0.8113412397427049,2,2,2026-04-01 23:10:02.183312,user_001
+4,Project Task 4,Task related to Software Engineer or music integration 4,1,3,user_001,2026-04-13 23:10:02.183312,1.034156291009023,2.8649873813715425,1,1,2026-04-01 23:10:02.183312,user_001
+5,Project Task 5,Task related to Software Engineer or music integration 5,1,3,user_001,2026-04-14 23:10:02.183312,7.808722811015187,0.6622128315267468,1,2,2026-04-01 23:10:02.183312,user_001
+6,Project Task 6,Task related to Software Engineer or music integration 6,2,1,user_001,2026-04-29 23:10:02.183312,2.820377338894336,3.0379685667348366,2,2,2026-04-01 23:10:02.183312,user_001
+7,Project Task 7,Task related to Software Engineer or music integration 7,3,2,user_001,2026-04-23 23:10:02.183312,4.884211483815463,0.9317369443622878,1,1,2026-04-01 23:10:02.183312,user_001
+8,Project Task 8,Task related to Software Engineer or music integration 8,3,1,user_001,2026-04-19 23:10:02.183312,2.615243335468736,3.7935823379297116,3,2,2026-04-01 23:10:02.183312,user_001
+9,Project Task 9,Task related to Software Engineer or music integration 9,2,1,user_001,2026-04-08 23:10:02.183312,3.8353315537078103,1.5433367708849755,3,1,2026-04-01 23:10:02.183312,user_001
+10,Project Task 10,Task related to Software Engineer or music integration 10,3,2,user_001,2026-04-30 23:10:02.183312,3.040117993185563,1.257222386707713,2,2,2026-04-01 23:10:02.183312,user_001

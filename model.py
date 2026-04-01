@@ -1,21 +1,21 @@
 import pandas as pd
-import numpy as np
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.preprocessing import LabelEncoder
-import joblib
 import os
+import joblib
+from sklearn.preprocessing import LabelEncoder
 
-MODEL_FILE = "calendar_attendance_model.pkl"
+# --- Paths ---
+DATA_FOLDER = "data"
+MODEL_FILE = os.path.join(DATA_FOLDER, "calendar_attendance_model.pkl")
+ENCODER_FILE = os.path.join(DATA_FOLDER, "label_encoder_user.pkl")
 
-# Initialize or load model
-if os.path.exists(MODEL_FILE):
+# --- Load trained model ---
+if os.path.exists(MODEL_FILE) and os.path.exists(ENCODER_FILE):
     model = joblib.load(MODEL_FILE)
-    le_user = joblib.load("label_encoder_user.pkl")
+    le_user = joblib.load(ENCODER_FILE)
 else:
-    model = GradientBoostingClassifier()
-    le_user = LabelEncoder()
+    raise FileNotFoundError("Trained model or encoder not found. Run train_model_from_csv.py first.")
 
-# Convert CalendarEvent to ML features
+# --- Convert CalendarEvent to ML features ---
 def prepare_features(events: pd.DataFrame):
     df = events.copy()
     df['Hour'] = df['StartDate'].dt.hour
@@ -24,23 +24,19 @@ def prepare_features(events: pd.DataFrame):
     df['Importance'] = df['Importance'].map({'Low':0, 'Medium':1, 'High':2})
     
     # Encode UserId
-    if not hasattr(le_user, 'classes_') or len(le_user.classes_) == 0:
-        df['UserIdEnc'] = le_user.fit_transform(df['UserId'])
-    else:
-        df['UserIdEnc'] = le_user.transform(df['UserId'])
+    df['UserIdEnc'] = le_user.transform(df['UserId'])
     
-    features = df[['Hour', 'DayOfWeek', 'IsRecurring', 'Importance', 'UserIdEnc']]
-    return features
+    return df[['Hour', 'DayOfWeek', 'IsRecurring', 'Importance', 'UserIdEnc']]
 
-# Train model with new batch
+# --- Predict attendance probability ---
+def predict(events: pd.DataFrame):
+    X = prepare_features(events)
+    return model.predict_proba(X)[:,1]  # probability of attending
+
+# --- Optional: train model with new data ---
 def train_model(events: pd.DataFrame, labels: pd.Series):
     global model
     X = prepare_features(events)
     model.fit(X, labels)
     joblib.dump(model, MODEL_FILE)
-    joblib.dump(le_user, "label_encoder_user.pkl")
-
-# Predict attendance probability
-def predict(events: pd.DataFrame):
-    X = prepare_features(events)
-    return model.predict_proba(X)[:,1]  # probability of attending
+    joblib.dump(le_user, ENCODER_FILE)
