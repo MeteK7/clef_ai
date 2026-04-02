@@ -1,0 +1,11 @@
+generate_dataset.py
+    Exports calendar data from the database and prepares it as a training dataset.
+
+train_model_from_csv.py
+    Trains the machine learning model using the dataset and saves the model and encoders to be used in model.py.
+
+model.py
+    Loads the trained model and provides prediction and training functions (AI engine).
+
+app.py
+    This is the API layer. It exposes AI as an API. FastAPI service that exposes the AI model via HTTP endpoints (/predict, /train).
