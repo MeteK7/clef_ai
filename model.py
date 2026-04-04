@@ -11,8 +11,11 @@ ENCODER_FILE = os.path.join(DATA_FOLDER, "label_encoder_user.pkl")
 
 # --- Load trained model ---
 if os.path.exists(MODEL_FILE) and os.path.exists(ENCODER_FILE):
+    print("Loading model...")
     model = joblib.load(MODEL_FILE)
+    print("Model loaded")
     le_user = joblib.load(ENCODER_FILE)
+    print("Encoder loaded")
 else:
     raise FileNotFoundError("Trained model or encoder not found. Run train_model_from_csv.py first.")
 
