@@ -17,8 +17,8 @@ ENCODER_FILE = os.path.join(DATA_FOLDER, "label_encoder_user.pkl")
 df = pd.read_csv(CSV_FILE, parse_dates=['StartDate', 'EndDate'])
 
 # --- Basic preprocessing ---
-df['Hour'] = df['StartDate'].dt.hour
-df['DayOfWeek'] = df['StartDate'].dt.dayofweek
+df['Hour'] = df.get('HourOfDay', df['StartDate'].dt.hour)
+df['DayOfWeek'] = df.get('DayOfWeek', df['StartDate'].dt.dayofweek)
 df['IsRecurring'] = df['IsRecurring'].astype(int)
 df['Importance'] = df['Importance'].map({'Low':0, 'Medium':1, 'High':2})
 
@@ -26,8 +26,29 @@ df['Importance'] = df['Importance'].map({'Low':0, 'Medium':1, 'High':2})
 le_user = LabelEncoder()
 df['UserIdEnc'] = le_user.fit_transform(df['UserId'])
 
+df['DurationMinutes'] = (
+    (df['EndDate'] - df['StartDate']).dt.total_seconds() / 60
+)
+
 # --- Features & labels ---
-FEATURES = ['Hour', 'DayOfWeek', 'IsRecurring', 'Importance', 'UserIdEnc']
+FEATURES = [
+    'Hour',
+    'DayOfWeek',
+    'DurationMinutes',
+    'IsRecurring',
+    'Importance',
+    'UserIdEnc',
+
+    'RescheduleCount',
+    'AvgDaysRescheduled',
+    'EditCount',
+    'ViewSignalValue',
+
+    'HasLinkedTask',
+    'LinkedTaskReopenCount',
+    'LinkedTaskStatusChanges',
+    'LinkedTaskCompletionRate'
+]
 X = df[FEATURES]
 y = df['Attended']
 

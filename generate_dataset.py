@@ -121,7 +121,19 @@ for i in range(50):  # more events for better dataset
         "EventTypeId": event_type,
         "IsRecurring": is_recurring,
         "RecurrenceRuleJson": '{"FREQ":"WEEKLY"}' if is_recurring else None,
-        "Attended": attended  # <-- realistic label
+
+        # 🔥 NEW AI FEATURES (ADD HERE)
+        "RescheduleCount": random.randint(0, 5),
+        "AvgDaysRescheduled": random.uniform(0, 3),
+        "EditCount": random.randint(0, 10),
+        "ViewSignalValue": random.uniform(0, 5),
+
+        "HasLinkedTask": 1,
+        "LinkedTaskReopenCount": random.randint(0, 3),
+        "LinkedTaskStatusChanges": random.randint(1, 10),
+        "LinkedTaskCompletionRate": random.choice([0, 1]),
+
+        "Attended": attended
     })
     event_id_counter += 1
 

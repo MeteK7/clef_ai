@@ -23,32 +23,66 @@ else:
 def prepare_features(events: pd.DataFrame):
     df = events.copy()
 
-    # Convert dates to datetime if not already
     df['StartDate'] = pd.to_datetime(df['StartDate'])
     df['EndDate'] = pd.to_datetime(df['EndDate'])
 
-    # Time features
+    # --- Time features ---
     df['Hour'] = df['StartDate'].dt.hour
     df['DayOfWeek'] = df['StartDate'].dt.dayofweek
 
-    # Boolean to int
+    # --- Duration ---
+    df['DurationMinutes'] = (
+        (df['EndDate'] - df['StartDate']).dt.total_seconds() / 60
+    ).fillna(0)
+
+    # --- Boolean ---
     df['IsRecurring'] = df['IsRecurring'].astype(int)
+    df['HasLinkedTask'] = df.get('HasLinkedTask', False).astype(int)
 
-    # Map Importance safely
+    # --- Importance ---
     importance_map = {'Low': 0, 'Medium': 1, 'High': 2}
-    df['Importance'] = df['Importance'].map(importance_map).fillna(0).astype(int)  # Unknown → Low
+    df['Importance'] = df['Importance'].map(importance_map).fillna(0).astype(int)
 
-    # Encode UserId safely
+    # --- Behavioral signals (safe defaults) ---
+    df['RescheduleCount'] = df.get('RescheduleCount', 0).fillna(0)
+    df['AvgDaysRescheduled'] = df.get('AvgDaysRescheduled', 0).fillna(0)
+    df['EditCount'] = df.get('EditCount', 0).fillna(0)
+    df['ViewSignalValue'] = df.get('ViewSignalValue', 0).fillna(0)
+
+    # --- Task signals ---
+    df['LinkedTaskReopenCount'] = df.get('LinkedTaskReopenCount', 0).fillna(0)
+    df['LinkedTaskStatusChanges'] = df.get('LinkedTaskStatusChanges', 0).fillna(0)
+    df['LinkedTaskCompletionRate'] = df.get('LinkedTaskCompletionRate', 0).fillna(0)
+
+    # --- User encoding ---
     known_users = set(le_user.classes_)
     new_users = set(df['UserId']) - known_users
 
     if new_users:
-        # Extend LabelEncoder classes with new users
         le_user.classes_ = np.append(le_user.classes_, list(new_users))
 
     df['UserIdEnc'] = le_user.transform(df['UserId'])
 
-    return df[['Hour', 'DayOfWeek', 'IsRecurring', 'Importance', 'UserIdEnc']]
+    return df[[
+        'Hour',
+        'DayOfWeek',
+        'DurationMinutes',
+        'IsRecurring',
+        'Importance',
+        'UserIdEnc',
+
+        # behavioral
+        'RescheduleCount',
+        'AvgDaysRescheduled',
+        'EditCount',
+        'ViewSignalValue',
+
+        # task
+        'HasLinkedTask',
+        'LinkedTaskReopenCount',
+        'LinkedTaskStatusChanges',
+        'LinkedTaskCompletionRate'
+    ]]
 
 # --- Predict attendance probability ---
 def predict(events: pd.DataFrame):
