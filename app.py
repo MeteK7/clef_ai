@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
 from typing import List
 import pandas as pd
 from model import predict, train_model
@@ -49,7 +48,7 @@ def predict_endpoint(events: List[CalendarEventInput]):
 
 @app.post("/train")
 def train_endpoint(data: TrainDataInput):
-    df = pd.DataFrame([e.dict() for e in data.events])
+    df = pd.DataFrame([e.dict(by_alias=True) for e in data.events])
     df['StartDate'] = pd.to_datetime(df['StartDate'])
     df['EndDate'] = pd.to_datetime(df['EndDate'])
     train_model(df, pd.Series(data.labels))

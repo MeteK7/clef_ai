@@ -19,7 +19,7 @@ df = pd.read_csv(CSV_FILE, parse_dates=['StartDate', 'EndDate'])
 # --- Basic preprocessing ---
 df['Hour'] = df.get('HourOfDay', df['StartDate'].dt.hour)
 df['DayOfWeek'] = df.get('DayOfWeek', df['StartDate'].dt.dayofweek)
-df['IsRecurring'] = df['IsRecurring'].astype(int)
+df['IsRecurring'] = df.get('IsRecurring', False).astype(int)
 df['Importance'] = df['Importance'].map({'Low':0, 'Medium':1, 'High':2})
 
 # --- Encode UserId ---
@@ -38,17 +38,16 @@ FEATURES = [
     'IsRecurring',
     'Importance',
     'UserIdEnc',
-
     'RescheduleCount',
     'AvgDaysRescheduled',
     'EditCount',
     'ViewSignalValue',
-
     'HasLinkedTask',
     'LinkedTaskReopenCount',
     'LinkedTaskStatusChanges',
     'LinkedTaskCompletionRate'
 ]
+
 X = df[FEATURES]
 y = df['Attended']
 

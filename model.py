@@ -27,8 +27,8 @@ def prepare_features(events: pd.DataFrame):
     df['EndDate'] = pd.to_datetime(df['EndDate'])
 
     # --- Time features ---
-    df['Hour'] = df['StartDate'].dt.hour
-    df['DayOfWeek'] = df['StartDate'].dt.dayofweek
+    df['Hour'] = df.get('HourOfDay', df['StartDate'].dt.hour)
+    df['DayOfWeek'] = df.get('DayOfWeek', df['StartDate'].dt.dayofweek)
 
     # --- Duration ---
     df['DurationMinutes'] = (
@@ -36,7 +36,7 @@ def prepare_features(events: pd.DataFrame):
     ).fillna(0)
 
     # --- Boolean ---
-    df['IsRecurring'] = df['IsRecurring'].astype(int)
+    df['IsRecurring'] = df.get('IsRecurring', False).astype(int)
     df['HasLinkedTask'] = df.get('HasLinkedTask', False).astype(int)
 
     # --- Importance ---
