@@ -10,10 +10,27 @@ app = FastAPI(title="Smart Calendar AI")
 
 class CalendarEventInput(BaseModel):
     UserId: str = Field(alias="userId")
+    EventId: int = Field(alias="eventId")
+
     StartDate: datetime = Field(alias="startDate")
     EndDate: datetime = Field(alias="endDate")
+
+    DurationMinutes: float = Field(alias="durationMinutes")
+    HourOfDay: int = Field(alias="hourOfDay")
+    DayOfWeek: int = Field(alias="dayOfWeek")
+
     Importance: str = Field(alias="importance")
     IsRecurring: bool = Field(alias="isRecurring")
+
+    RescheduleCount: int = Field(default=0, alias="rescheduleCount")
+    AvgDaysRescheduled: float = Field(default=0, alias="avgDaysRescheduled")
+    EditCount: int = Field(default=0, alias="editCount")
+    ViewSignalValue: float = Field(default=0, alias="viewSignalValue")
+
+    HasLinkedTask: bool = Field(default=False, alias="hasLinkedTask")
+    LinkedTaskReopenCount: int = Field(default=0, alias="linkedTaskReopenCount")
+    LinkedTaskStatusChanges: int = Field(default=0, alias="linkedTaskStatusChanges")
+    LinkedTaskCompletionRate: float = Field(default=0, alias="linkedTaskCompletionRate")
 
     class Config:
         populate_by_name = True
@@ -24,7 +41,7 @@ class TrainDataInput(BaseModel):
 
 @app.post("/predict")
 def predict_endpoint(events: List[CalendarEventInput]):
-    df = pd.DataFrame([e.dict() for e in events])
+    df = pd.DataFrame([e.dict(by_alias=True) for e in events])
     df['StartDate'] = pd.to_datetime(df['StartDate'])
     df['EndDate'] = pd.to_datetime(df['EndDate'])
     probs = predict(df)
