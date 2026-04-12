@@ -4,95 +4,155 @@ import joblib
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-# --- Paths ---
+# ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_FOLDER = "data"
-MODEL_FILE = os.path.join(DATA_FOLDER, "calendar_attendance_model.pkl")
+MODEL_FILE   = os.path.join(DATA_FOLDER, "calendar_attendance_model.pkl")
 ENCODER_FILE = os.path.join(DATA_FOLDER, "label_encoder_user.pkl")
 
-# --- Load trained model ---
-if os.path.exists(MODEL_FILE) and os.path.exists(ENCODER_FILE):
-    print("Loading model...")
-    model = joblib.load(MODEL_FILE)
-    print("Model loaded")
-    le_user = joblib.load(ENCODER_FILE)
-    print("Encoder loaded")
-else:
-    raise FileNotFoundError("Trained model or encoder not found. Run train_model_from_csv.py first.")
+# ── Ordered feature list (must match train script exactly) ────────────────────
+FEATURES = [
+    "Hour",
+    "DayOfWeek",
+    "DurationMinutes",
+    "IsRecurring",
+    "Importance",
+    "UserIdEnc",
+    "RescheduleCount",
+    "AvgDaysRescheduled",
+    "EditCount",
+    "ViewSignalValue",
+    "HasLinkedTask",
+    "LinkedTaskReopenCount",
+    "LinkedTaskStatusChanges",
+    "LinkedTaskCompletionRate",
+]
 
-# --- Safe feature preparation ---
-def prepare_features(events: pd.DataFrame):
+# ── Lazy-load model & encoder (don't crash on startup) ────────────────────────
+_model   = None
+_le_user = None
+
+
+def is_model_loaded() -> bool:
+    return _model is not None and _le_user is not None
+
+
+def _load_if_needed():
+    global _model, _le_user
+    if _model is not None:
+        return
+    if os.path.exists(MODEL_FILE) and os.path.exists(ENCODER_FILE):
+        print("Loading model...")
+        _model   = joblib.load(MODEL_FILE)
+        _le_user = joblib.load(ENCODER_FILE)
+        print("Model and encoder loaded.")
+    else:
+        print(
+            "WARNING: No trained model found. "
+            "Run train_model_from_csv.py before calling /predict."
+        )
+
+
+# ── Safe column accessor ──────────────────────────────────────────────────────
+
+def _safe_col(df: pd.DataFrame, col: str, default) -> pd.Series:
+    """Return the column if it exists, otherwise a Series filled with default."""
+    if col in df.columns:
+        return df[col].fillna(default)
+    return pd.Series([default] * len(df), index=df.index)
+
+
+# ── Feature engineering ───────────────────────────────────────────────────────
+
+def prepare_features(events: pd.DataFrame) -> pd.DataFrame:
     df = events.copy()
 
-    df['StartDate'] = pd.to_datetime(df['StartDate'])
-    df['EndDate'] = pd.to_datetime(df['EndDate'])
+    df["StartDate"] = pd.to_datetime(df["StartDate"])
+    df["EndDate"]   = pd.to_datetime(df["EndDate"])
 
-    # --- Time features ---
-    df['Hour'] = df.get('HourOfDay', df['StartDate'].dt.hour)
-    df['DayOfWeek'] = df.get('DayOfWeek', df['StartDate'].dt.dayofweek)
+    # Temporal
+    df["Hour"]      = df["StartDate"].dt.hour
+    df["DayOfWeek"] = df["StartDate"].dt.dayofweek
 
-    # --- Duration ---
-    df['DurationMinutes'] = (
-        (df['EndDate'] - df['StartDate']).dt.total_seconds() / 60
-    ).fillna(0)
+    # Duration (authoritative: always recalculate from dates)
+    df["DurationMinutes"] = (
+        (df["EndDate"] - df["StartDate"]).dt.total_seconds() / 60
+    ).fillna(0).clip(lower=0)
 
-    # --- Boolean ---
-    df['IsRecurring'] = df.get('IsRecurring', False).astype(int)
-    df['HasLinkedTask'] = df.get('HasLinkedTask', False).astype(int)
+    # Boolean → int
+    df["IsRecurring"]  = _safe_col(df, "IsRecurring",  False).astype(int)
+    df["HasLinkedTask"] = _safe_col(df, "HasLinkedTask", False).astype(int)
 
-    # --- Importance ---
-    importance_map = {'Low': 0, 'Medium': 1, 'High': 2}
-    df['Importance'] = df['Importance'].map(importance_map).fillna(0).astype(int)
+    # Importance: accept both string and numeric input
+    importance_map = {"Low": 0, "Medium": 1, "High": 2}
+    if df["Importance"].dtype == object:
+        df["Importance"] = df["Importance"].map(importance_map).fillna(1).astype(int)
+    else:
+        df["Importance"] = df["Importance"].fillna(1).astype(int)
 
-    # --- Behavioral signals (safe defaults) ---
-    df['RescheduleCount'] = df.get('RescheduleCount', 0).fillna(0)
-    df['AvgDaysRescheduled'] = df.get('AvgDaysRescheduled', 0).fillna(0)
-    df['EditCount'] = df.get('EditCount', 0).fillna(0)
-    df['ViewSignalValue'] = df.get('ViewSignalValue', 0).fillna(0)
+    # Behavioral signals
+    df["RescheduleCount"]    = _safe_col(df, "RescheduleCount",    0)
+    df["AvgDaysRescheduled"] = _safe_col(df, "AvgDaysRescheduled", 0.0)
+    df["EditCount"]          = _safe_col(df, "EditCount",          0)
+    df["ViewSignalValue"]    = _safe_col(df, "ViewSignalValue",    0.0)
 
-    # --- Task signals ---
-    df['LinkedTaskReopenCount'] = df.get('LinkedTaskReopenCount', 0).fillna(0)
-    df['LinkedTaskStatusChanges'] = df.get('LinkedTaskStatusChanges', 0).fillna(0)
-    df['LinkedTaskCompletionRate'] = df.get('LinkedTaskCompletionRate', 0).fillna(0)
+    # Task signals
+    df["LinkedTaskReopenCount"]    = _safe_col(df, "LinkedTaskReopenCount",    0)
+    df["LinkedTaskStatusChanges"]  = _safe_col(df, "LinkedTaskStatusChanges",  0)
+    df["LinkedTaskCompletionRate"] = _safe_col(df, "LinkedTaskCompletionRate", 0.0)
 
-    # --- User encoding ---
-    known_users = set(le_user.classes_)
-    new_users = set(df['UserId']) - known_users
+    # User encoding — handle unseen users without corrupting the encoder
+    _load_if_needed()
+    le = _le_user  # may still be None during an initial train call (handled in train_model)
 
-    if new_users:
-        le_user.classes_ = np.append(le_user.classes_, list(new_users))
+    if le is not None:
+        known_users = set(le.classes_)
+        new_users   = sorted(set(df["UserId"]) - known_users)
+        if new_users:
+            # Keep classes sorted so transform() works correctly
+            le.classes_ = np.array(sorted(np.append(le.classes_, new_users)))
+        df["UserIdEnc"] = le.transform(df["UserId"])
+    else:
+        # Fallback during the very first training run (before any encoder exists)
+        tmp = LabelEncoder()
+        df["UserIdEnc"] = tmp.fit_transform(df["UserId"])
 
-    df['UserIdEnc'] = le_user.transform(df['UserId'])
+    return df[FEATURES]
 
-    return df[[
-        'Hour',
-        'DayOfWeek',
-        'DurationMinutes',
-        'IsRecurring',
-        'Importance',
-        'UserIdEnc',
 
-        # behavioral
-        'RescheduleCount',
-        'AvgDaysRescheduled',
-        'EditCount',
-        'ViewSignalValue',
+# ── Public API ────────────────────────────────────────────────────────────────
 
-        # task
-        'HasLinkedTask',
-        'LinkedTaskReopenCount',
-        'LinkedTaskStatusChanges',
-        'LinkedTaskCompletionRate'
-    ]]
-
-# --- Predict attendance probability ---
-def predict(events: pd.DataFrame):
+def predict(events: pd.DataFrame) -> np.ndarray:
+    """Return attendance probability (0–1) for each row."""
+    _load_if_needed()
+    if _model is None:
+        raise RuntimeError("Model is not loaded. Train first.")
     X = prepare_features(events)
-    return model.predict_proba(X)[:,1]  # probability of attending
+    return _model.predict_proba(X)[:, 1]
 
-# --- Train model with new data ---
+
 def train_model(events: pd.DataFrame, labels: pd.Series):
-    global model, le_user
+    """Re-fit (full re-train) with the supplied data and persist to disk."""
+    global _model, _le_user
+
+    _load_if_needed()  # load existing model/encoder if available
+
+    # If there's no encoder yet, build one from scratch
+    if _le_user is None:
+        _le_user = LabelEncoder()
+        _le_user.fit(events["UserId"])
+
     X = prepare_features(events)
-    model.fit(X, labels)
-    joblib.dump(model, MODEL_FILE)
-    joblib.dump(le_user, ENCODER_FILE)
+
+    if _model is None:
+        # First-ever training: build a fresh classifier
+        from sklearn.ensemble import GradientBoostingClassifier
+        _model = GradientBoostingClassifier(
+            n_estimators=200, learning_rate=0.1, max_depth=3, random_state=42
+        )
+
+    _model.fit(X, labels)
+
+    os.makedirs(DATA_FOLDER, exist_ok=True)
+    joblib.dump(_model,   MODEL_FILE)
+    joblib.dump(_le_user, ENCODER_FILE)
+    print(f"Model retrained on {len(labels)} samples and saved.")

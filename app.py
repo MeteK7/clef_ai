@@ -1,11 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import pandas as pd
-from model import predict, train_model
+from model import predict, train_model, is_model_loaded
 from datetime import datetime
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Smart Calendar AI")
+
+# ── CORS ─────────────────────────────────────────────────────────────────────
+# Allow the .NET backend (and local dev) to reach this API.
+# Tighten `allow_origins` to your actual backend URL in production.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
 
 class CalendarEventInput(BaseModel):
     UserId: str = Field(alias="userId")
@@ -22,37 +37,66 @@ class CalendarEventInput(BaseModel):
     IsRecurring: bool = Field(alias="isRecurring")
 
     RescheduleCount: int = Field(default=0, alias="rescheduleCount")
-    AvgDaysRescheduled: float = Field(default=0, alias="avgDaysRescheduled")
+    AvgDaysRescheduled: float = Field(default=0.0, alias="avgDaysRescheduled")
     EditCount: int = Field(default=0, alias="editCount")
-    ViewSignalValue: float = Field(default=0, alias="viewSignalValue")
+    ViewSignalValue: float = Field(default=0.0, alias="viewSignalValue")
 
     HasLinkedTask: bool = Field(default=False, alias="hasLinkedTask")
     LinkedTaskReopenCount: int = Field(default=0, alias="linkedTaskReopenCount")
     LinkedTaskStatusChanges: int = Field(default=0, alias="linkedTaskStatusChanges")
-    LinkedTaskCompletionRate: float = Field(default=0, alias="linkedTaskCompletionRate")
+    LinkedTaskCompletionRate: float = Field(default=0.0, alias="linkedTaskCompletionRate")
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}   # Pydantic v2 style
+
 
 class TrainDataInput(BaseModel):
     events: List[CalendarEventInput]
     labels: List[int]  # 1 = attended, 0 = skipped
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def events_to_df(events: List[CalendarEventInput]) -> pd.DataFrame:
+    """Convert a list of Pydantic models to a DataFrame (Pydantic v2 safe)."""
+    df = pd.DataFrame([e.model_dump(by_alias=True) for e in events])
+    df["StartDate"] = pd.to_datetime(df["StartDate"], utc=True).dt.tz_convert(None)
+    df["EndDate"]   = pd.to_datetime(df["EndDate"],   utc=True).dt.tz_convert(None)
+    return df
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    """Quick liveness probe used by .NET HttpClient or orchestrators."""
+    return {"status": "ok", "model_loaded": is_model_loaded()}
+
+
 @app.post("/predict")
 def predict_endpoint(events: List[CalendarEventInput]):
-    df = pd.DataFrame([e.dict(by_alias=True) for e in events])
-    df['StartDate'] = pd.to_datetime(df['StartDate'])
-    df['EndDate'] = pd.to_datetime(df['EndDate'])
+    if not is_model_loaded():
+        raise HTTPException(
+            status_code=503,
+            detail="Model not loaded. Run train_model_from_csv.py first."
+        )
+    if not events:
+        raise HTTPException(status_code=400, detail="Event list is empty.")
+
+    df = events_to_df(events)
     probs = predict(df)
     return {"predictions": probs.tolist()}
 
+
 @app.post("/train")
 def train_endpoint(data: TrainDataInput):
-    df = pd.DataFrame([e.dict(by_alias=True) for e in data.events])
-    df['StartDate'] = pd.to_datetime(df['StartDate'])
-    df['EndDate'] = pd.to_datetime(df['EndDate'])
+    if len(data.events) != len(data.labels):
+        raise HTTPException(
+            status_code=400,
+            detail="events and labels lists must be the same length."
+        )
+    if not data.events:
+        raise HTTPException(status_code=400, detail="Event list is empty.")
+
+    df = events_to_df(data.events)
     train_model(df, pd.Series(data.labels))
-    return {"status": "trained"}
-
-
-    
+    return {"status": "trained", "samples": len(data.labels)}
