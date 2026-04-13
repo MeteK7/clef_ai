@@ -2,11 +2,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import pandas as pd
-from model import predict, train_model, is_model_loaded
+from model import predict, train_model, is_model_loaded, _load_if_needed
 from datetime import datetime
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Smart Calendar AI")
+
+@app.on_event("startup")
+def load_model():
+    print("🔄 Loading model at startup...")
+    _load_if_needed()
+    print("✅ Model loaded:", is_model_loaded())
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
 # Allow the .NET backend (and local dev) to reach this API.
@@ -58,7 +64,7 @@ class TrainDataInput(BaseModel):
 
 def events_to_df(events: List[CalendarEventInput]) -> pd.DataFrame:
     """Convert a list of Pydantic models to a DataFrame (Pydantic v2 safe)."""
-    df = pd.DataFrame([e.model_dump(by_alias=True) for e in events])
+    df = pd.DataFrame([e.model_dump() for e in events])
     df["StartDate"] = pd.to_datetime(df["StartDate"], utc=True).dt.tz_convert(None)
     df["EndDate"]   = pd.to_datetime(df["EndDate"],   utc=True).dt.tz_convert(None)
     return df
