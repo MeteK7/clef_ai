@@ -82,12 +82,7 @@ def prepare_features(events: pd.DataFrame) -> pd.DataFrame:
     df["IsRecurring"]  = _safe_col(df, "IsRecurring",  False).astype(int)
     df["HasLinkedTask"] = _safe_col(df, "HasLinkedTask", False).astype(int)
 
-    # Importance: accept both string and numeric input
-    importance_map = {"Low": 0, "Medium": 1, "High": 2}
-    if df["Importance"].dtype == object:
-        df["Importance"] = df["Importance"].map(importance_map).fillna(1).astype(int)
-    else:
-        df["Importance"] = df["Importance"].fillna(1).astype(int)
+    df["Importance"] = df["Importance"].fillna(1).astype(int)
 
     # Behavioral signals
     df["RescheduleCount"]    = _safe_col(df, "RescheduleCount",    0)
