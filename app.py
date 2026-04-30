@@ -14,9 +14,7 @@ def load_model():
     _load_if_needed()
     print("✅ Model loaded:", is_model_loaded())
 
-# ── CORS ─────────────────────────────────────────────────────────────────────
-# Allow the .NET backend (and local dev) to reach this API.
-# Tighten `allow_origins` to your actual backend URL in production.
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,8 +23,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ── Pydantic models ───────────────────────────────────────────────────────────
+# -----------------------------
+# Pydantic models
+# -----------------------------
 
 class CalendarEventInput(BaseModel):
     UserId: str = Field(alias="userId")
@@ -39,7 +38,7 @@ class CalendarEventInput(BaseModel):
     HourOfDay: int = Field(alias="hourOfDay")
     DayOfWeek: int = Field(alias="dayOfWeek")
 
-    Importance: str = Field(alias="importance")
+    Importance: int = Field(alias="importance")
     IsRecurring: bool = Field(alias="isRecurring")
 
     RescheduleCount: int = Field(default=0, alias="rescheduleCount")
@@ -52,29 +51,33 @@ class CalendarEventInput(BaseModel):
     LinkedTaskStatusChanges: int = Field(default=0, alias="linkedTaskStatusChanges")
     LinkedTaskCompletionRate: float = Field(default=0.0, alias="linkedTaskCompletionRate")
 
-    model_config = {"populate_by_name": True}   # Pydantic v2 style
+    model_config = {"populate_by_name": True}
 
 
 class TrainDataInput(BaseModel):
     events: List[CalendarEventInput]
-    labels: List[int]  # 1 = attended, 0 = skipped
+    labels: List[int]
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -----------------------------
+# Helpers
+# -----------------------------
 
 def events_to_df(events: List[CalendarEventInput]) -> pd.DataFrame:
-    """Convert a list of Pydantic models to a DataFrame (Pydantic v2 safe)."""
     df = pd.DataFrame([e.model_dump() for e in events])
+
     df["StartDate"] = pd.to_datetime(df["StartDate"], utc=True).dt.tz_convert(None)
     df["EndDate"]   = pd.to_datetime(df["EndDate"],   utc=True).dt.tz_convert(None)
+
     return df
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# -----------------------------
+# Endpoints
+# -----------------------------
 
 @app.get("/health")
 def health():
-    """Quick liveness probe used by .NET HttpClient or orchestrators."""
     return {"status": "ok", "model_loaded": is_model_loaded()}
 
 
@@ -85,11 +88,13 @@ def predict_endpoint(events: List[CalendarEventInput]):
             status_code=503,
             detail="Model not loaded. Run train_model_from_csv.py first."
         )
+
     if not events:
         raise HTTPException(status_code=400, detail="Event list is empty.")
 
     df = events_to_df(events)
     probs = predict(df)
+
     return {"predictions": probs.tolist()}
 
 
@@ -100,9 +105,11 @@ def train_endpoint(data: TrainDataInput):
             status_code=400,
             detail="events and labels lists must be the same length."
         )
+
     if not data.events:
         raise HTTPException(status_code=400, detail="Event list is empty.")
 
     df = events_to_df(data.events)
     train_model(df, pd.Series(data.labels))
+
     return {"status": "trained", "samples": len(data.labels)}
