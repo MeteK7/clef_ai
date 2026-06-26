@@ -11,8 +11,11 @@ app = FastAPI(title="Smart Calendar AI")
 @app.on_event("startup")
 def load_model():
     print("🔄 Loading model at startup...")
-    _load_if_needed()
-    print("✅ Model loaded:", is_model_loaded())
+    try:
+        _load_if_needed()
+        print("✅ Model loaded:", is_model_loaded())
+    except Exception as e:
+        print("⚠️ Model load failed:", e)
 
 # CORS
 app.add_middleware(

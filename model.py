@@ -6,6 +6,7 @@ from sklearn.preprocessing import LabelEncoder
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_FOLDER = "data"
+os.makedirs(DATA_FOLDER, exist_ok=True)
 MODEL_FILE   = os.path.join(DATA_FOLDER, "calendar_attendance_model.pkl")
 ENCODER_FILE = os.path.join(DATA_FOLDER, "label_encoder_user.pkl")
 

@@ -38,7 +38,7 @@ FEATURES = [
     "LinkedTaskCompletionRate",
 ]
 
-# ── Load ──────────────────────────────────────────────────────────────────────
+#  Load 
 if not os.path.exists(CSV_FILE):
     raise FileNotFoundError(
         f"Dataset not found at {CSV_FILE}. Run generate_dataset.py first."
@@ -47,7 +47,7 @@ if not os.path.exists(CSV_FILE):
 df = pd.read_csv(CSV_FILE, parse_dates=["StartDate", "EndDate"])
 print(f"Loaded {len(df)} rows from {CSV_FILE}.")
 
-# ── Preprocessing ─────────────────────────────────────────────────────────────
+#  Preprocessing 
 df["Hour"]      = df["StartDate"].dt.hour
 df["DayOfWeek"] = df["StartDate"].dt.dayofweek
 
@@ -82,7 +82,7 @@ for col, default in [
 le_user = LabelEncoder()
 df["UserIdEnc"] = le_user.fit_transform(df["UserId"])
 
-# ── Split ─────────────────────────────────────────────────────────────────────
+#  Split 
 X = df[FEATURES]
 y = df["Attended"]
 
@@ -99,7 +99,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 print(f"Train: {len(X_train)}  Test: {len(X_test)}")
 
-# ── Train ─────────────────────────────────────────────────────────────────────
+#  Train 
 model = GradientBoostingClassifier(
     n_estimators=200,
     learning_rate=0.1,
@@ -108,7 +108,7 @@ model = GradientBoostingClassifier(
 )
 model.fit(X_train, y_train)
 
-# ── Evaluate ──────────────────────────────────────────────────────────────────
+#  Evaluate 
 y_pred  = model.predict(X_test)
 y_proba = model.predict_proba(X_test)[:, 1]
 
@@ -116,12 +116,12 @@ print(f"Accuracy : {accuracy_score(y_test, y_pred):.4f}")
 print(f"ROC AUC  : {roc_auc_score(y_test, y_proba):.4f}")
 print("\nClassification Report:\n", classification_report(y_test, y_pred))
 
-# ── Feature importances ───────────────────────────────────────────────────────
+#  Feature importances 
 print("Feature importances:")
 for feat, imp in sorted(zip(FEATURES, model.feature_importances_), key=lambda x: -x[1]):
     print(f"  {feat:<30} {imp:.4f}")
 
-# ── Save ──────────────────────────────────────────────────────────────────────
+#  Save 
 os.makedirs(DATA_FOLDER, exist_ok=True)
 joblib.dump(model,   MODEL_FILE)
 joblib.dump(le_user, ENCODER_FILE)
