@@ -79,6 +79,14 @@ def events_to_df(events: List[CalendarEventInput]) -> pd.DataFrame:
 # Endpoints
 # -----------------------------
 
+import sklearn
+
+@app.get("/version")
+def version():
+    return {
+        "sklearn": sklearn.__version__
+    }
+    
 @app.get("/health")
 def health():
     return {"status": "ok", "model_loaded": is_model_loaded()}
