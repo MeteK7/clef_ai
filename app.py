@@ -1,12 +1,21 @@
-from fastapi import FastAPI, HTTPException
+import os
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Optional
 import pandas as pd
 from model import predict, train_model, is_model_loaded, _load_if_needed
 from datetime import datetime
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Smart Calendar AI")
+
+TRAIN_API_KEY = os.environ.get("AI_TRAIN_API_KEY")
+
+
+def verify_train_api_key(x_api_key: Optional[str] = Header(default=None, alias="X-API-Key")):
+    # Fail closed: an unset secret rejects every request rather than allowing all of them.
+    if not TRAIN_API_KEY or x_api_key != TRAIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Missing or invalid X-API-Key.")
 
 @app.on_event("startup")
 def load_model():
@@ -109,7 +118,7 @@ def predict_endpoint(events: List[CalendarEventInput]):
     return {"predictions": probs.tolist()}
 
 
-@app.post("/train")
+@app.post("/train", dependencies=[Depends(verify_train_api_key)])
 def train_endpoint(data: TrainDataInput):
     if len(data.events) != len(data.labels):
         raise HTTPException(
