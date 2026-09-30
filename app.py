@@ -10,11 +10,20 @@ from pydantic import BaseModel, Field
 app = FastAPI(title="Smart Calendar AI")
 
 TRAIN_API_KEY = os.environ.get("AI_TRAIN_API_KEY")
+PREDICT_API_KEY = os.environ.get("AI_PREDICT_API_KEY")
+
+MAX_PREDICT_BATCH_SIZE = 500
 
 
 def verify_train_api_key(x_api_key: Optional[str] = Header(default=None, alias="X-API-Key")):
     # Fail closed: an unset secret rejects every request rather than allowing all of them.
     if not TRAIN_API_KEY or x_api_key != TRAIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Missing or invalid X-API-Key.")
+
+
+def verify_predict_api_key(x_api_key: Optional[str] = Header(default=None, alias="X-API-Key")):
+    # Fail closed, same as verify_train_api_key.
+    if not PREDICT_API_KEY or x_api_key != PREDICT_API_KEY:
         raise HTTPException(status_code=401, detail="Missing or invalid X-API-Key.")
 
 @app.on_event("startup")
@@ -26,11 +35,13 @@ def load_model():
     except Exception as e:
         print("⚠️ Model load failed:", e)
 
-# CORS
+# CORS: this service is only ever called server-to-server, from ClefCraft-Backend's
+# own HttpClient - never directly from a browser - so no origin needs cross-origin
+# access here.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -101,7 +112,7 @@ def health():
     return {"status": "ok", "model_loaded": is_model_loaded()}
 
 
-@app.post("/predict")
+@app.post("/predict", dependencies=[Depends(verify_predict_api_key)])
 def predict_endpoint(events: List[CalendarEventInput]):
     if not is_model_loaded():
         raise HTTPException(
@@ -111,6 +122,12 @@ def predict_endpoint(events: List[CalendarEventInput]):
 
     if not events:
         raise HTTPException(status_code=400, detail="Event list is empty.")
+
+    if len(events) > MAX_PREDICT_BATCH_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Batch too large: {len(events)} events (max {MAX_PREDICT_BATCH_SIZE})."
+        )
 
     df = events_to_df(events)
     probs = predict(df)
