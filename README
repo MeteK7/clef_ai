@@ -1,5 +1,5 @@
 generate_dataset.py
-    Exports calendar data from the database and prepares it as a training dataset.
+    Generates a synthetic dataset (one fictional user, "user_001") as CSV files in data/. It does not read from the database.
 
 train_model_from_csv.py
     Trains the machine learning model using the dataset and saves the model and encoders to be used in model.py.
@@ -9,3 +9,19 @@ model.py
 
 app.py
     This is the API layer. It exposes AI as an API. FastAPI service that exposes the AI model via HTTP endpoints (/predict, /train).
+
+Local setup (temporary: the backend stops calling this service in roadmap step 6)
+    Python 3.10 (as in CI). From the repository root:
+
+        python -m venv .venv
+        .venv\Scriptsctivate            (Windows; on Linux/macOS: source .venv/bin/activate)
+        pip install -r requirements.txt -r requirements-dev.txt
+        pytest
+
+    To run the service for the backend (AIService:BaseUrl defaults to http://localhost:8000):
+
+        set AI_PREDICT_API_KEY=<same value as the backend's AIService:PredictApiKey>
+        uvicorn app:app --port 8000
+
+    Without AI_PREDICT_API_KEY every /predict call is rejected, and the backend shows no
+    attendance predictions.
