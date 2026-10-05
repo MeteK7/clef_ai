@@ -9,3 +9,19 @@ model.py
 
 app.py
     This is the API layer. It exposes AI as an API. FastAPI service that exposes the AI model via HTTP endpoints (/predict, /train).
+
+Local setup (temporary: the backend stops calling this service in roadmap step 6)
+    Python 3.10 (as in CI). From the repository root:
+
+        python -m venv .venv
+        .venv\Scriptsctivate            (Windows; on Linux/macOS: source .venv/bin/activate)
+        pip install -r requirements.txt -r requirements-dev.txt
+        pytest
+
+    To run the service for the backend (AIService:BaseUrl defaults to http://localhost:8000):
+
+        set AI_PREDICT_API_KEY=<same value as the backend's AIService:PredictApiKey>
+        uvicorn app:app --port 8000
+
+    Without AI_PREDICT_API_KEY every /predict call is rejected, and the backend shows no
+    attendance predictions.
